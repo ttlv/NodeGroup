@@ -21,14 +21,12 @@ import (
 	"fmt"
 	"github.com/go-logr/logr"
 	"github.com/google/martian/log"
-	_ "github.com/google/martian/log"
 	nodegroupv1alpha1 "github.com/ttlv/NodeGroup/api/v1alpha1"
 	"github.com/ttlv/NodeGroup/model"
 	nmv1alpha1 "github.com/ttlv/nodemaintenances/api/v1alpha1"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	_ "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -56,10 +54,7 @@ func (r *NodeGroupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 		//nodeGroupSelectors []string
 		nodeList       = &v1.NodeList{}
 		nodeGroupLists = []model.NodeGroupList{}
-		//nodemaintenance     = &nmv1alpha1.NodeMaintenance{}
-		ctx = context.Background()
-		//_   = r.Log.WithValues("nodegroup", req.NamespacedName)
-		//_   = r.Log.WithValues("nodemaintenances", req.NamespacedName)
+		ctx            = context.Background()
 	)
 
 	if err := r.List(ctx, nodeList); err != nil {
@@ -67,34 +62,38 @@ func (r *NodeGroupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	} else {
 		for _, item := range nodeList.Items {
 			var (
-				ready, nodeMaintenancesName, nodeGroupName string
-				isEdge                                     bool
+				nodeMaintenancesName, nodeGroupName string
+				ready                               = "false"
 			)
 			for _, value := range item.Status.Conditions {
-				if value.Type == "Ready" {
+				if value.Type != "Ready" {
+					continue
+				}
+				if value.Status == "True" {
 					ready = "true"
-				} else {
-					ready = "false"
 				}
 			}
+			// 根据节点名字去关联nm对象,节点的命名格式为node-uniqueId,nodemaintenance的格式为nodemaintenances-uniqueId
 			for key, value := range item.Labels {
 				// kubeedge节点一定有nm对象
 				if key == "kubernetes.io/hostname" {
-					if strings.Contains(value, "-") {
-						nodeMaintenancesName = fmt.Sprintf("nodemaintenances-%v", strings.Split(value, "-")[1])
+					if strings.Contains(value, "node-") {
+						nm := &nmv1alpha1.NodeMaintenance{}
+						// 判断是否存在nm对象
+						if err := r.Get(ctx, types.NamespacedName{Namespace: "", Name: fmt.Sprintf("nodemaintenances-%v", strings.Split(value, "-")[1])}, nm); err == nil {
+							nodeMaintenancesName = nm.Name
+						}
 					}
-				}
-				if key == "node-role.kubernetes.io/edge" {
-					isEdge = true
 				}
 				if strings.Contains(key, "name.nodegroup.edge.harmonycloud.cn/") {
 					nodeGroupName = strings.Split(key, "/")[1]
 				}
 			}
-			if isEdge {
+			if nodeMaintenancesName != "" {
 				nodeMaintenance := &nmv1alpha1.NodeMaintenance{}
 				if err := r.Get(ctx, types.NamespacedName{Namespace: "", Name: nodeMaintenancesName}, nodeMaintenance); err != nil {
 					log.Errorf("err is: %v and unable to fetch nm", err)
+					continue
 				}
 				nodeGroupLists = append(nodeGroupLists, model.NodeGroupList{
 					NodeGroupName:       nodeGroupName,
@@ -117,23 +116,25 @@ func (r *NodeGroupReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
 	} else {
 		for _, ngl := range nodeGroupList.Items {
 			for _, temp := range nodeGroupLists {
-				var found bool
-				for _, statusNodeList := range ngl.Status.NodeList {
-					if statusNodeList.NodeName == temp.NodeName {
-						found = true
-						statusNodeList.NodeName = temp.NodeName
-						statusNodeList.Maintenanable = temp.Maintenanable
-						statusNodeList.Ready = temp.Ready
-						statusNodeList.NodeMaintenanceName = temp.NodeMaintenanceName
+				if ngl.Name == temp.NodeGroupName {
+					var found bool
+					for i := 0; i <= len(ngl.Status.NodeList)-1; i++ {
+						if ngl.Status.NodeList[i].NodeName == temp.NodeName {
+							found = true
+							ngl.Status.NodeList[i].NodeName = temp.NodeName
+							ngl.Status.NodeList[i].Maintenanable = temp.Maintenanable
+							ngl.Status.NodeList[i].Ready = temp.Ready
+							ngl.Status.NodeList[i].NodeMaintenanceName = temp.NodeMaintenanceName
+						}
 					}
-				}
-				if !found {
-					ngl.Status.NodeList = append(ngl.Status.NodeList, nodegroupv1alpha1.NodeList{
-						NodeName:            temp.NodeName,
-						NodeMaintenanceName: temp.NodeMaintenanceName,
-						Ready:               temp.Ready,
-						Maintenanable:       temp.Maintenanable,
-					})
+					if !found {
+						ngl.Status.NodeList = append(ngl.Status.NodeList, nodegroupv1alpha1.NodeList{
+							NodeName:            temp.NodeName,
+							NodeMaintenanceName: temp.NodeMaintenanceName,
+							Ready:               temp.Ready,
+							Maintenanable:       temp.Maintenanable,
+						})
+					}
 				}
 			}
 			if err := r.Status().Update(ctx, &ngl); err != nil {
