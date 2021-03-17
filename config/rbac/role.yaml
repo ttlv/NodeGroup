@@ -1,0 +1,48 @@
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  creationTimestamp: null
+  name: manager-role
+rules:
+- apiGroups:
+  - edge.harmonycloud.cn
+  resources:
+  - nodegroups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - edge.harmonycloud.cn
+  resources:
+  - nodegroups/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - edge.harmonycloud.cn
+  resources:
+  - nodemaintenance
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - edge.harmonycloud.cn
+  resources:
+  - nodemaintenance/status
+  verbs:
+  - get
+  - patch
+  - update

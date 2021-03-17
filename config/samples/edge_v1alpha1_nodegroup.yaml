@@ -1,0 +1,8 @@
+apiVersion: edge.harmonycloud.cn/v1alpha1
+kind: NodeGroup
+metadata:
+  name: ng1
+spec:
+  # Add fields here
+  selector:
+    name.nodegroup.edge.harmonycloud.cn/ng1: true

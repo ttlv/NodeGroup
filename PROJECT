@@ -1,0 +1,7 @@
+domain: harmonycloud.cn
+repo: github.com/ttlv/NodeGroup
+resources:
+- group: edge
+  kind: NodeGroup
+  version: v1alpha1
+version: "2"
