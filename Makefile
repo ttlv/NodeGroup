@@ -1,6 +1,7 @@
 
+$(eval REV := $(shell git rev-parse HEAD|cut -c 1-8))
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= gopherlv/ng-controller:$(REV)
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true"
 
