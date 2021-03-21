@@ -28,7 +28,7 @@ type NodeGroupSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 
-	Selector map[string]bool `json:"selector"`
+	Selector map[string]string `json:"selector"`
 }
 
 // NodeGroupStatus defines the observed state of NodeGroup
